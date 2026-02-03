@@ -313,9 +313,13 @@
                         </div>
                     </div>
                 </div>
-                <div class="chart-container">
-                    <div class="chart-wrapper">
+                <div class="chart-container" style="display:flex;gap:16px;align-items:flex-start;">
+                    <div class="chart-wrapper" style="flex:1 1 auto;">
                         <canvas id="weatherChart"></canvas>
+                    </div>
+                    <div id="chartStats" class="chart-stats" style="min-width:220px;background:#fff;border:1px solid #e2e8f0;border-radius:12px;padding:12px;box-shadow:var(--shadow-sm);">
+                        <h4 style="margin:0 0 8px 0;color:#2d3748;">Range Stats</h4>
+                        <div id="statsContent" style="font-size:12px;color:#4a5568;">No data</div>
                     </div>
                 </div>
             </div>
@@ -1171,12 +1175,28 @@ if (props.filename) {
                 }
             });
 
-            // Update chart when checkboxes change
             document.querySelectorAll('.column-checkboxes input[type="checkbox"]').forEach(checkbox => {
                 checkbox.addEventListener('change', function() {
                     const selectedColumns = getSelectedColumns();
-                    weatherChart.data.datasets = selectedColumns.map(col => createDataset(col));
+                    const labels = weatherChart.data.labels;
+                    weatherChart.data.datasets = selectedColumns.map(k => {
+                        const c = columnConfig[k];
+                        return {
+                            label: c.label,
+                            data: labels.map(L => {
+                                const d = filteredData.find(x => x.date === L);
+                                return d ? d[k] : null;
+                            }),
+                            borderColor: c.borderColor,
+                            backgroundColor: c.color + '33',
+                            fill: false,
+                            tension: 0.3,
+                            pointRadius: 2,
+                            pointHoverRadius: 5
+                        };
+                    });
                     weatherChart.update();
+                    updateStats(filteredData);
                 });
             });
 
@@ -1205,8 +1225,6 @@ if (props.filename) {
             function updateChartWithPeriod(period) {
                 currentPeriod = period;
                 filteredData = filterDataByPeriod(period);
-
-                // Update chart labels and data
                 weatherChart.data.labels = filteredData.map(d => d.date);
                 weatherChart.data.datasets = getSelectedColumns().map(columnKey => {
                     const config = columnConfig[columnKey];
@@ -1221,8 +1239,8 @@ if (props.filename) {
                         pointHoverRadius: 5
                     };
                 });
-
                 weatherChart.update();
+                updateStats(filteredData);
             }
 
             // Add event listeners to period buttons
@@ -1238,9 +1256,9 @@ if (props.filename) {
             // Initialize with month view
             updateChartWithPeriod('month');
 
-            // Date range controls
-            function setupDateRangeControls(){const m=weatherData.map(d=>d.date);if(!m.length)return;const min=m[0],max=m[m.length-1];const s=document.getElementById('startMonth'),e=document.getElementById('endMonth');if(!s||!e)return;s.min=min;s.max=max;e.min=min;e.max=max;if(!s.value)s.value=min;if(!e.value)e.value=max;}
-            function updateChartWithRange(s,e){filteredData=weatherData.filter(d=>d.date>=s&&d.date<=e);weatherChart.data.labels=filteredData.map(d=>d.date);weatherChart.data.datasets=getSelectedColumns().map(k=>{const c=columnConfig[k];return{label:c.label,data:filteredData.map(d=>d[k]),borderColor:c.borderColor,backgroundColor:c.color+'33',fill:false,tension:0.3,pointRadius:2,pointHoverRadius:5};});weatherChart.update();}
+            function setupDateRangeControls(){const m=weatherData.map(d=>d.date);if(!m.length)return;const min=m[0],max=m[m.length-1];const s=document.getElementById('startMonth'),e=document.getElementById('endMonth');if(!s||!e)return;s.min=min;s.max=max;e.min=min;e.max=max;if(!s.value)s.value=min;if(!e.value)e.value=max;} 
+            function updateStats(data){const s=document.getElementById('statsContent');if(!s){return;}const cols=getSelectedColumns();let html='';for(const k of cols){const vals=data.map(d=>d[k]).filter(v=>typeof v==='number'&&!isNaN(v));if(!vals.length)continue;const mn=Math.min(...vals),mx=Math.max(...vals);const label=columnConfig[k].label;html+=`<div style="margin-bottom:6px;"><strong>${label}</strong><br><span>min: ${mn.toFixed(2)}</span> • <span>max: ${mx.toFixed(2)}</span></div>`;}s.innerHTML=html||'No data';}
+            function updateChartWithRange(s,e){filteredData=weatherData.filter(d=>d.date>=s&&d.date<=e);weatherChart.data.labels=filteredData.map(d=>d.date);weatherChart.data.datasets=getSelectedColumns().map(k=>{const c=columnConfig[k];return{label:c.label,data:filteredData.map(d=>d[k]),borderColor:c.borderColor,backgroundColor:c.color+'33',fill:false,tension:0.3,pointRadius:2,pointHoverRadius:5};});weatherChart.update();updateStats(filteredData);} 
             const _s=document.getElementById('startMonth'),_e=document.getElementById('endMonth');
             document.getElementById('applyRange')?.addEventListener('click',()=>{if(!_s||!_e||!_s.value||!_e.value)return;const a=_s.value<=_e.value?_s.value:_e.value;const b=_e.value>=_s.value?_e.value:_s.value;updateChartWithRange(a,b);});
             document.getElementById('resetRange')?.addEventListener('click',()=>updateChartWithPeriod('year'));
